@@ -1,7 +1,7 @@
 # 🧾 WhatsApp Order Parser → Google Sheets
 
 A public Streamlit SaaS app that lets anyone paste messy WhatsApp order
-messages, uses an LLM (OpenAI Structured Outputs) to extract clean structured
+messages, uses an LLM (OpenRouter Structured Outputs) to extract clean structured
 data, appends it to **their own** Google Sheets via per-user OAuth, and builds
 interactive pivot tables on a dashboard.
 
@@ -10,7 +10,8 @@ interactive pivot tables on a dashboard.
 - **Per-user Google OAuth 2.0** — no shared service account; each visitor signs
   in with their own account. Tokens live only in the Streamlit session.
 - **AI parsing** of unstructured WhatsApp text into a strict JSON schema using
-  OpenAI Structured Outputs (guaranteed schema-valid output).
+  OpenRouter (OpenAI-compatible) Structured Outputs (guaranteed schema-valid
+  output). Swap models via the `OPENROUTER_MODEL` secret.
 - **Editable preview** (`st.data_editor`) before saving — supports multiple
   orders per message and manual corrections.
 - **Drive integration** — pick an existing spreadsheet or create a new one.

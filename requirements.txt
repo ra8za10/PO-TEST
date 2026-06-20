@@ -7,6 +7,6 @@ google-auth>=2.34.0
 google-auth-oauthlib>=1.2.1
 google-api-python-client>=2.140.0
 
-# AI parsing (OpenAI Structured Outputs)
+# AI parsing — OpenRouter via the OpenAI-compatible SDK (Structured Outputs)
 openai>=1.50.0
 pydantic>=2.8.0
