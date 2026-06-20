@@ -81,25 +81,45 @@ def _build_flow(state: str | None = None) -> Flow:
 
 
 # ---------------------------------------------------------------------------
+# Cross-redirect PKCE / state store
+# ---------------------------------------------------------------------------
+# CRITICAL: an OAuth round-trip navigates the whole browser away to Google and
+# back. The app therefore returns in a *fresh* Streamlit session with an EMPTY
+# st.session_state — so it cannot carry the PKCE `code_verifier` (or the CSRF
+# `state`) across the redirect. Instead we keep a small process-global map keyed
+# by the `state` value, which Google echoes back to us on the callback. This
+# survives across sessions within the same server process (Streamlit Community
+# Cloud runs one process per app, so this holds).
+_PENDING_VERIFIERS: dict[str, str] = {}
+_PENDING_MAX = 64
+
+
+def _remember_state(state: str, code_verifier: str | None) -> None:
+    """Stash the PKCE verifier for an in-flight login, bounding memory use."""
+    if len(_PENDING_VERIFIERS) >= _PENDING_MAX:
+        # Drop the oldest pending login to keep the map from growing unbounded.
+        _PENDING_VERIFIERS.pop(next(iter(_PENDING_VERIFIERS)), None)
+    _PENDING_VERIFIERS[state] = code_verifier or ""
+
+
+# ---------------------------------------------------------------------------
 # Step 1: send the user to Google's consent screen
 # ---------------------------------------------------------------------------
 def build_authorization_url() -> str:
-    """Return the Google consent URL and stash the CSRF `state` in the session."""
+    """Return the Google consent URL and remember its PKCE verifier server-side."""
     flow = _build_flow()
     auth_url, state = flow.authorization_url(
         access_type="offline",      # request a refresh_token...
         prompt="consent",           # ...and force consent so we always get one
         include_granted_scopes="true",
     )
-    # `state` ties this browser session to the redirect we expect back. We
-    # compare it in handle_oauth_callback to defeat CSRF / mixed-up callbacks.
-    st.session_state["oauth_state"] = state
-    # google-auth-oauthlib enables PKCE by default (autogenerate_code_verifier),
-    # so `authorization_url()` just sent a `code_challenge` derived from this
-    # verifier. The token exchange happens on a LATER Streamlit rerun with a
-    # brand-new Flow object, so we must carry the verifier across — otherwise
-    # Google rejects fetch_token with "invalid_grant: Missing code verifier".
-    st.session_state["oauth_code_verifier"] = flow.code_verifier
+    # google-auth-oauthlib enables PKCE by default, so `authorization_url()` just
+    # sent a `code_challenge` derived from flow.code_verifier. We MUST present the
+    # matching verifier at token-exchange time. Stash it in the process-global
+    # store keyed by `state` (NOT session_state — that is gone after the
+    # redirect). Otherwise Google rejects fetch_token with "Missing code
+    # verifier". The store lookup on callback also doubles as the CSRF check.
+    _remember_state(state, flow.code_verifier)
     return auth_url
 
 
@@ -116,18 +136,24 @@ def handle_oauth_callback() -> bool:
         return False
 
     returned_state = params.get("state")
-    expected_state = st.session_state.get("oauth_state")
-    # CSRF check: the state Google echoes back must match the one we generated.
-    if expected_state and returned_state and returned_state != expected_state:
-        st.error("Validasi keamanan OAuth gagal (state tidak cocok). Coba login ulang.")
+    # Recover the PKCE verifier for this login from the process store, keyed by
+    # the `state` Google echoed back. Its presence is ALSO our CSRF check: we
+    # only proceed for a `state` value that this server actually issued. (Returns
+    # from a normal session_state since that is empty in this fresh session.)
+    code_verifier = _PENDING_VERIFIERS.pop(returned_state, None) if returned_state else None
+    if code_verifier is None:
+        st.error(
+            "Sesi login tidak valid atau kedaluwarsa (server mungkin baru "
+            "di-restart). Silakan klik 'Login with Google' lagi."
+        )
         st.query_params.clear()
         return False
 
     try:
-        flow = _build_flow(state=expected_state)
-        # Restore the PKCE verifier generated for THIS login so the code_verifier
-        # sent to the token endpoint matches the original code_challenge.
-        flow.code_verifier = st.session_state.get("oauth_code_verifier")
+        flow = _build_flow(state=returned_state)
+        # Present the matching PKCE verifier so the token endpoint accepts the
+        # code (empty string -> None means "no PKCE", handled gracefully).
+        flow.code_verifier = code_verifier or None
         # Reconstruct the full callback URL Streamlit was hit with. oauthlib
         # parses the `code` (and `scope`) out of it to request the token.
         authorization_response = _get_redirect_uri() + "?" + _querystring(params)
@@ -212,5 +238,5 @@ def is_authenticated() -> bool:
 
 def logout() -> None:
     """Drop all auth-related state. The user returns to the landing page."""
-    for key in ("credentials", "user_info", "oauth_state"):
+    for key in ("credentials", "user_info"):
         st.session_state.pop(key, None)
