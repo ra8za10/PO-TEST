@@ -1,0 +1,12 @@
+# Core UI
+streamlit>=1.39.0
+pandas>=2.2.0
+
+# Google OAuth + API clients
+google-auth>=2.34.0
+google-auth-oauthlib>=1.2.1
+google-api-python-client>=2.140.0
+
+# AI parsing (OpenAI Structured Outputs)
+openai>=1.50.0
+pydantic>=2.8.0
