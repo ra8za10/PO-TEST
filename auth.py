@@ -94,6 +94,12 @@ def build_authorization_url() -> str:
     # `state` ties this browser session to the redirect we expect back. We
     # compare it in handle_oauth_callback to defeat CSRF / mixed-up callbacks.
     st.session_state["oauth_state"] = state
+    # google-auth-oauthlib enables PKCE by default (autogenerate_code_verifier),
+    # so `authorization_url()` just sent a `code_challenge` derived from this
+    # verifier. The token exchange happens on a LATER Streamlit rerun with a
+    # brand-new Flow object, so we must carry the verifier across — otherwise
+    # Google rejects fetch_token with "invalid_grant: Missing code verifier".
+    st.session_state["oauth_code_verifier"] = flow.code_verifier
     return auth_url
 
 
@@ -119,6 +125,9 @@ def handle_oauth_callback() -> bool:
 
     try:
         flow = _build_flow(state=expected_state)
+        # Restore the PKCE verifier generated for THIS login so the code_verifier
+        # sent to the token endpoint matches the original code_challenge.
+        flow.code_verifier = st.session_state.get("oauth_code_verifier")
         # Reconstruct the full callback URL Streamlit was hit with. oauthlib
         # parses the `code` (and `scope`) out of it to request the token.
         authorization_response = _get_redirect_uri() + "?" + _querystring(params)
