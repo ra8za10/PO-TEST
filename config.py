@@ -83,3 +83,20 @@ def get_secret(key: str, default: str | None = None) -> str | None:
     except Exception:  # pragma: no cover - secrets file simply absent
         pass
     return os.environ.get(key, default)
+
+
+# ---------------------------------------------------------------------------
+# Legal / contact details used by the Privacy Policy and Terms pages
+# ---------------------------------------------------------------------------
+# EDIT THESE (or override any of them in secrets.toml). Google's OAuth
+# verification team checks that these pages exist, are reachable WITHOUT
+# logging in, and identify a real operator with a working contact address.
+APP_NAME = get_secret("APP_NAME", "WA Order Parser")
+# Your name or registered business name — the party these terms are between.
+LEGAL_ENTITY = get_secret("LEGAL_ENTITY", "WA Order Parser")
+# TODO: replace with a real, monitored address before going public.
+CONTACT_EMAIL = get_secret("CONTACT_EMAIL", "you@example.com")
+LEGAL_LAST_UPDATED = get_secret("LEGAL_LAST_UPDATED", "26 Juli 2026")
+GOVERNING_LAW = get_secret("GOVERNING_LAW", "Republik Indonesia")
+# Name of the AI provider that receives pasted text — must be disclosed.
+AI_PROVIDER = get_secret("AI_PROVIDER_NAME", "OpenRouter")

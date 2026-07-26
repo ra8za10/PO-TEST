@@ -27,7 +27,13 @@ interactive pivot tables on a dashboard.
 | `google_services.py` | Drive (list) + Sheets (create/append/read) wrappers |
 | `ai_parser.py` | LLM parsing engine + Pydantic schema |
 | `pivot.py` | Pivot-table construction helpers |
-| `config.py` | Scopes, schema, secrets loader |
+| `config.py` | Scopes, schema, secrets loader, legal/contact details |
+| `pages/1_Privacy_Policy.py` | Public privacy policy (`/Privacy_Policy`) |
+| `pages/2_Terms_of_Service.py` | Public terms of service (`/Terms_of_Service`) |
+
+> **Before going public:** set `LEGAL_ENTITY` and `CONTACT_EMAIL` (in `config.py`
+> or secrets). The legal pages are deliberately reachable without signing in,
+> because Google's OAuth verification reviewers must be able to read them.
 
 ## 🚀 Setup
 

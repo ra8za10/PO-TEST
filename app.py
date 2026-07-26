@@ -62,6 +62,16 @@ def render_landing() -> None:
         except RuntimeError as exc:
             st.error(str(exc))
         st.caption("Kami meminta akses Google Sheets & daftar Drive (read-only).")
+        # Google's OAuth verification requires these to be linked from the app
+        # and readable without signing in.
+        st.caption(
+            "Dengan masuk, kamu menyetujui Syarat & Ketentuan dan Kebijakan Privasi kami."
+        )
+        legal_a, legal_b = st.columns(2)
+        with legal_a:
+            st.page_link("pages/1_Privacy_Policy.py", label="Kebijakan Privasi", icon="🔒")
+        with legal_b:
+            st.page_link("pages/2_Terms_of_Service.py", label="Syarat & Ketentuan", icon="📜")
 
 
 # ===========================================================================

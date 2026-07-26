@@ -161,6 +161,33 @@ def append_rows(creds, spreadsheet_id: str, df: pd.DataFrame) -> int:
 # ---------------------------------------------------------------------------
 # Sheets: read the whole sheet back as a DataFrame
 # ---------------------------------------------------------------------------
+def _normalize_headers(header: list[str]) -> list[str]:
+    """Make a sheet's header row safe to use as DataFrame column names.
+
+    A real-world sheet often has blank header cells (which all collapse to "")
+    or genuinely repeated labels. pandas tolerates duplicate column names, but
+    Streamlit serialises DataFrames through PyArrow, which raises
+    "Duplicate column names found" and crashes the page. So we give every
+    column a unique, non-empty name here:
+
+        ["", "nama", "nama", ""]  ->  ["kolom_1", "nama", "nama_2", "kolom_4"]
+    """
+    seen: dict[str, int] = {}
+    cleaned: list[str] = []
+    for idx, raw in enumerate(header, start=1):
+        name = str(raw).strip() if raw is not None else ""
+        if not name:
+            # Position-based fallback so blank headers stay distinguishable.
+            name = f"kolom_{idx}"
+        if name in seen:
+            seen[name] += 1
+            name = f"{name}_{seen[name]}"
+        else:
+            seen[name] = 1
+        cleaned.append(name)
+    return cleaned
+
+
 def read_sheet(creds, spreadsheet_id: str, sheet_range: str = "A1:Z100000") -> pd.DataFrame:
     """Read a sheet into a DataFrame, using row 1 as the column headers."""
     try:
@@ -176,10 +203,13 @@ def read_sheet(creds, spreadsheet_id: str, sheet_range: str = "A1:Z100000") -> p
             return pd.DataFrame(columns=ORDER_COLUMNS)
 
         header, *data = rows
-        # Rows from Sheets can be "ragged" (trailing empty cells omitted), so we
-        # pad every row to the header width before constructing the DataFrame.
-        width = len(header)
-        padded = [row + [""] * (width - len(row)) for row in data]
-        return pd.DataFrame(padded, columns=header)
+        columns = _normalize_headers(header)
+        width = len(columns)
+        # Rows from Sheets are "ragged": trailing empty cells are omitted, and a
+        # row can also be WIDER than the header if someone typed past the last
+        # labelled column. Pad short rows and truncate long ones so every row
+        # matches the header width exactly.
+        shaped = [(row + [""] * (width - len(row)))[:width] for row in data]
+        return pd.DataFrame(shaped, columns=columns)
     except HttpError as exc:
         raise GoogleServiceError(f"Gagal membaca data dari Google Sheets: {exc}") from exc
